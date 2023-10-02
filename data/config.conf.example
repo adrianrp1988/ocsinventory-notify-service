@@ -1,0 +1,13 @@
+[database]
+server=db-server-ip
+database=database
+username=jhon
+password=foobar
+
+[mail]
+server=smtp-server-ip
+use_ssl=0
+server_port=1025
+sender=sender@email.net
+sender_password=s3cur3P4ssw0r6
+recipients=recipient@email.net
