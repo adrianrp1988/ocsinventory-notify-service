@@ -31,7 +31,6 @@ def poll_database():
     cursor.execute(query)
     hardware_change_event_list = cursor.fetchall()
     
-    
     # Send email if there are new results
     if hardware_change_event_list:
         event_list_dictionary = {event["ID"]: event for event in hardware_change_event_list}
@@ -71,7 +70,7 @@ def poll_database():
                                 <tbody>
                                     <tr style="height: 17px;">
                                         <td colspan="2" class="sessionDetails" style="border-style: solid; border-color:#a7a9ac; border-width: 1px 1px 0 1px;height: 35px;background-color: #c4f9b1;font-size: 16px;vertical-align: middle;padding: 5px 0 0 15px;color: #626365; font-family: Tahoma;">
-                                            <span>PC: {str(event_data["NAME"])} - IP: {str(event_data["IP_ADDRESS"])} - Usuario: {str(event_data["USERNAME"])}</span>
+                                            <span>PC: {str(event_data["NAME"])} - IP: {str(event_data["IP_ADDRESS"])} - Usuario: {str(event_data["USERNAME"])} - Ultimo scan: {str(event_data["LAST_SCAN_DATETIME"])}</span>
                                         </td>
                                     </tr>
                                 </tbody>
