@@ -1,11 +1,13 @@
 FROM python:3.9-alpine3.18
 
+COPY ./requirements.txt /tmp/
+
+RUN pip install --no-cache-dir --upgrade -r /tmp/requirements.txt
+
+RUN rm /tmp/requirements.txt
+
 WORKDIR /app
 
 COPY ./app .
 
-RUN pip install --no-cache-dir --upgrade -r /app/requirements.txt
-
-RUN rm requirements.txt
-
-CMD ["python", "/app/main.py"]
+CMD ["python", "-u", "/app/main.py"]

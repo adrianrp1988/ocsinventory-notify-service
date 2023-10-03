@@ -4,13 +4,11 @@ services:
   web:
     image: adrianrp1988/ocsinventory-notify-service:1.0
     build: ./build
-    container_name : ocsinventory-api
+    container_name : ocsinventory-notify-service
     volumes:
       - ./data:/app/data
     expose:
       - 80
-    environment:
-      VIRTUAL_HOST: ocsinventory-api.local
     networks:
       - services
 

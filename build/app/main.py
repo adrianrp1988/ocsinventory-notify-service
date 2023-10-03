@@ -2,6 +2,8 @@ import configparser
 import smtplib
 import mysql.connector
 import time
+from email.mime.multipart import MIMEMultipart
+from email.message import EmailMessage
 
 config = configparser.ConfigParser()
 config.read("data/config.conf")
@@ -28,35 +30,115 @@ def poll_database():
     query = "SELECT * FROM hardware_change_events WHERE ID > " + last_id + " ORDER BY ID"
     cursor.execute(query)
     hardware_change_event_list = cursor.fetchall()
-    event_list_dictionary = {event["ID"]: event for event in hardware_change_event_list}
+    
     
     # Send email if there are new results
     if hardware_change_event_list:
+        event_list_dictionary = {event["ID"]: event for event in hardware_change_event_list}
         query = "SELECT * FROM hardware_change_events_data WHERE EVENT_ID >= "+ str(hardware_change_event_list[0]["ID"]) + " ORDER BY EVENT_ID"
         cursor.execute(query)
         hardware_change_event_data_list = cursor.fetchall()
 
         # Format message
-        message = "Se han detectado cambios en el hardware de los siguientes equipos:\n"
+        message = EmailMessage()
+        message['Subject'] = "Cambio de Hardware detectado"
+        message['From'] = email_sender
+
+        body = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        </head>
+        <body>
+            <table style="border-collapse: collapse;" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tbody>
+                    <tr>
+                        <td style="border: none;background-color: #fb9895;color: White;font-weight: bold;font-size: 16px;padding: 10px;font-family: Tahoma;">Alerta: Cambio de Hardware detectado</td>
+                    </tr>
+                    <tr>
+                        <td style="border: none; padding: 0px;font-family: Tahoma;font-size: 12px;">
+        """
+
         current_event_id = 0
         for section_data in hardware_change_event_data_list:
             if current_event_id != section_data["EVENT_ID"]:
                 current_event_id = section_data["EVENT_ID"]
                 event_data = event_list_dictionary[current_event_id]
-                message += "Equipo: " + str(event_data["NAME"]) + ", IP: " + str(event_data["IP_ADDRESS"]) +", Usuario: " + str(event_data["USERNAME"]) + "\n"
+
+                body +=f""" 
+                            <table class="inner" style="margin: 0px;border-collapse: collapse;" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <tbody>
+                                    <tr style="height: 17px;">
+                                        <td colspan="2" class="sessionDetails" style="border-style: solid; border-color:#a7a9ac; border-width: 1px 1px 0 1px;height: 35px;background-color: #c4f9b1;font-size: 16px;vertical-align: middle;padding: 5px 0 0 15px;color: #626365; font-family: Tahoma;">
+                                            <span>PC: {str(event_data["NAME"])} - IP: {str(event_data["IP_ADDRESS"])} - Usuario: {str(event_data["USERNAME"])}</span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>"""
+            body += f"""
+                            <table class="inner" style="margin: 0px;border-collapse: collapse;" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <tbody>
+                                    <tr style="height: 17px;">
+                                        <td colspan="2" style="background-color: #f3f4f4;font-size: 16px;vertical-align: middle;padding: 5px 0 0 15px;color: #626365; font-family: Tahoma;border: 1px solid #a7a9ac;" nowrap="nowrap">{section_data["SECTION"]}</td>
+                                    </tr>
+                                </tbody>
+                            </table>"""
+            body += f"""
+                            <table class="inner" style="margin: 0px;border-collapse: collapse;" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <tbody>
+                                    <tr style="height: 17px;">
+                                        <td style="padding: 2px 3px 2px 3px;vertical-align: top;border: 1px solid #a7a9ac;font-family: Tahoma;font-size: 12px;"
+                                            nowrap="nowrap"><b>Descripcion</b>
+                                        </td>"""
+            for field in section_data["FIELDS"].split(","):
+                body+=f"""
+                                        <td style="padding: 2px 3px 2px 3px;vertical-align: top;border: 1px solid #a7a9ac;font-family: Tahoma;font-size: 12px;"
+                                            nowrap="nowrap"><b>{field}</b>
+                                        </td>"""
+            body += """            </tr>"""
             
-            message += "Seccion: " + section_data["SECTION"] + "\n"
-            message += "Campos: " + section_data["FIELDS"] + "\n"
-            message += "Hardware anadido: " + section_data["HARDWARE_ADDED"] + "\n"
-            message += "Hardware removido: " + section_data["HARDWARE_REMOVED"] + "\n\n"
-        
+            body += f"""
+                                    <tr style="height: 17px;">
+                                        <td style="padding: 2px 3px 2px 3px;vertical-align: top;border: 1px solid #a7a9ac;font-family: Tahoma;font-size: 12px;"
+                                            nowrap="nowrap"><b>Hardware Anadido</b>
+                                        </td>""" 
+            for added in section_data["HARDWARE_ADDED"].split(","):
+                body+=f"""
+                                        <td style="padding: 2px 3px 2px 3px;vertical-align: top;border: 1px solid #a7a9ac;font-family: Tahoma;font-size: 12px;"
+                                            nowrap="nowrap"><b>{added}</b>
+                                        </td>"""
+            body += """            </tr>"""          
+            body += f"""
+                                    <tr style="height: 17px;">
+                                        <td style="padding: 2px 3px 2px 3px;vertical-align: top;border: 1px solid #a7a9ac;font-family: Tahoma;font-size: 12px;"
+                                            nowrap="nowrap"><b>Hardware Removido</b>
+                                        </td>"""
+            for removed in section_data["HARDWARE_REMOVED"].split(","):
+                body+=f"""
+                                        <td style="padding: 2px 3px 2px 3px;vertical-align: top;border: 1px solid #a7a9ac;font-family: Tahoma;font-size: 12px;"
+                                            nowrap="nowrap"><b>{removed}</b>
+                                        </td>"""
+            body += """            </tr>
+                                </tbody>
+                            </table>"""
+        body +="""
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </body>
+        </html>
+        """
+        message.set_content(body, subtype='html')
+
         # Send email
         smtp_server = smtplib.SMTP_SSL(email_server, email_server_port) if email_server_use_ssl else smtplib.SMTP(email_server, email_server_port)
         smtp_server.ehlo()
         smtp_server.login(email_sender, email_password)
-
+        
         for recipient in email_recipients.split(","):
-           sendmail(smtp_server, email_sender, recipient, message) 
+           sendmail(smtp_server, recipient, message) 
         smtp_server.close()
 
         last_id = hardware_change_event_list[-1]["ID"]
@@ -64,14 +146,14 @@ def poll_database():
     
     return last_id
 
-def sendmail(mail_server, sender, recipient, message):
-    content='From:' + sender + '\n' + 'To:' + recipient + '\n' + 'Subject:Cambio de Hardware detectado\n' + message
-    mail_server.sendmail(email_sender, recipient, content)
-
+def sendmail(mail_server, recipient, message: MIMEMultipart):
+    message['To'] = recipient
+    mail_server.sendmail(email_sender, recipient, message.as_string())
+    del message['To']
+    
 def close_db_connection():
     cursor.close()
     db_connection.close()
-
 
 # Writing the last ID to a file
 def save_last_id(last_id):
