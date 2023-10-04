@@ -145,7 +145,7 @@ def poll_database():
     
     return last_id
 
-def sendmail(mail_server, recipient, message: MIMEMultipart):
+def sendmail(mail_server, recipient, message: EmailMessage):
     message['To'] = recipient
     mail_server.sendmail(email_sender, recipient, message.as_string())
     del message['To']
