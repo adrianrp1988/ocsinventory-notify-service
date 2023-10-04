@@ -66,7 +66,7 @@ def poll_database():
                 event_data = event_list_dictionary[current_event_id]
 
                 body +=f""" 
-                            <table class="inner" style="margin: 0px;border-collapse: collapse;" width="100%" cellspacing="0" cellpadding="0" border="0">
+                            <table class="inner" style="margin:30px 0 0;border-collapse: collapse;" width="100%" cellspacing="0" cellpadding="0" border="0">
                                 <tbody>
                                     <tr style="height: 17px;">
                                         <td colspan="2" class="sessionDetails" style="border-style: solid; border-color:#a7a9ac; border-width: 1px 1px 0 1px;height: 35px;background-color: #c4f9b1;font-size: 16px;vertical-align: middle;padding: 5px 0 0 15px;color: #626365; font-family: Tahoma;">
@@ -93,7 +93,7 @@ def poll_database():
             for field in section_data["FIELDS"].split(","):
                 body+=f"""
                                         <td style="padding: 2px 3px 2px 3px;vertical-align: top;border: 1px solid #a7a9ac;font-family: Tahoma;font-size: 12px;"
-                                            nowrap="nowrap"><b>{field}</b>
+                                            nowrap="nowrap"><b>{field.strip("'").strip('"')}</b>
                                         </td>"""
             body += """            </tr>"""
             
@@ -105,7 +105,7 @@ def poll_database():
             for added in section_data["HARDWARE_ADDED"].split(","):
                 body+=f"""
                                         <td style="padding: 2px 3px 2px 3px;vertical-align: top;border: 1px solid #a7a9ac;font-family: Tahoma;font-size: 12px;"
-                                            nowrap="nowrap"><b>{added}</b>
+                                            nowrap="nowrap"><b>{added.strip("'").strip('"')}</b>
                                         </td>"""
             body += """            </tr>"""          
             body += f"""
@@ -116,7 +116,7 @@ def poll_database():
             for removed in section_data["HARDWARE_REMOVED"].split(","):
                 body+=f"""
                                         <td style="padding: 2px 3px 2px 3px;vertical-align: top;border: 1px solid #a7a9ac;font-family: Tahoma;font-size: 12px;"
-                                            nowrap="nowrap"><b>{removed}</b>
+                                            nowrap="nowrap"><b>{removed.strip("'").strip('"')}</b>
                                         </td>"""
             body += """            </tr>
                                 </tbody>
