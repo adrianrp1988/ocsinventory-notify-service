@@ -8,6 +8,8 @@ from email.message import EmailMessage
 config = configparser.ConfigParser()
 config.read("data/config.conf")
 
+#General config
+ocsinventory_server_url = config.get('general', 'ocsinventory_server_url')
 # Database configuration
 database_host = config.get('database', 'server')
 database_username = config.get('database', 'username')
@@ -50,85 +52,81 @@ def poll_database():
             <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
         </head>
         <body>
-            <table style="border-collapse: collapse;" width="100%" cellspacing="0" cellpadding="0" border="0">
-                <tbody>
+            <table style="border-collapse: collapse;" width="100%" cellspacing="0" cellpadding="0">
                     <tr>
                         <td style="border: none;background-color: #fb9895;color: White;font-weight: bold;font-size: 16px;padding: 10px;font-family: Tahoma;">Alerta: Cambio de Hardware detectado</td>
                     </tr>
                     <tr>
                         <td style="border: none; padding: 0px;font-family: Tahoma;font-size: 12px;">
-        """
+                            <table style="border-style: solid;border-width: 1px;margin:30px 0 0;">
+                            <tr>
+                                <td>"""
 
         current_event_id = 0
         for section_data in hardware_change_event_data_list:
             if current_event_id != section_data["EVENT_ID"]:
+                if (current_event_id):
+                    body +=f"""     </td>
+                                </tr>
+                            </table>
+                            <table style="border-style: solid;border-width: 1px;margin:30px 0 0;">
+                                <tr>
+                                    <td>"""
                 current_event_id = section_data["EVENT_ID"]
                 event_data = event_list_dictionary[current_event_id]
 
-                body +=f""" 
-                            <table class="inner" style="margin:30px 0 0;border-collapse: collapse;" width="100%" cellspacing="0" cellpadding="0" border="0">
-                                <tbody>
-                                    <tr style="height: 17px;">
-                                        <td colspan="2" class="sessionDetails" style="border-style: solid; border-color:#a7a9ac; border-width: 1px 1px 0 1px;height: 35px;background-color: #c4f9b1;font-size: 16px;vertical-align: middle;padding: 5px 0 0 15px;color: #626365; font-family: Tahoma;">
+                body +=f"""     <table width="100%" cellspacing="0" cellpadding="0">
+                                    <tr style="height: 17px;background-color: #4fc3f7">
+                                        <td class="sessionDetails" style="height: 35px;font-size: 24px;vertical-align: middle;padding: 5px 0 0 15px; font-family: Tahoma;">
                                             <span>PC: {str(event_data["NAME"])} - IP: {str(event_data["IP_ADDRESS"])} - Usuario: {str(event_data["USERNAME"])} - Ultimo scan: {str(event_data["LAST_SCAN_DATETIME"])}</span>
                                         </td>
+                                        <td align="right" style="height: 35px;font-size: 24px;vertical-align: middle;padding: 0 20px; font-family: Tahoma;">
+                                            <span><a href="{str(ocsinventory_server_url)}/ocsreports/index.php?function=computer&head=1&systemid={str(event_data["HARDWARE_ID"])}" target=”_blank”>Ver equipo en OCSInventory </a></span>
+                                        </td>
                                     </tr>
-                                </tbody>
-                            </table>"""
-            body += f"""
-                            <table class="inner" style="margin: 0px;border-collapse: collapse;" width="100%" cellspacing="0" cellpadding="0" border="0">
-                                <tbody>
+                                </table>"""
+            body += f"""        <table style="margin: 0px;border-collapse: collapse;" width="100%" cellspacing="0" cellpadding="0">
                                     <tr style="height: 17px;">
-                                        <td colspan="2" style="background-color: #f3f4f4;font-size: 16px;vertical-align: middle;padding: 5px 0 0 15px;color: #626365; font-family: Tahoma;border: 1px solid #a7a9ac;" nowrap="nowrap">{section_data["SECTION"]}</td>
+                                        <td style="font-size: 20px;vertical-align: middle;padding: 5px 0 0 15px; font-family: Tahoma;" nowrap="nowrap">{section_data["SECTION"]}</td>
                                     </tr>
-                                </tbody>
-                            </table>"""
-            body += f"""
-                            <table class="inner" style="margin: 0px;border-collapse: collapse;" width="100%" cellspacing="0" cellpadding="0" border="0">
-                                <tbody>
+                                </table>"""
+            body += f"""        <table style="margin: 0px;border-collapse: collapse;" width="100%" cellspacing="0" cellpadding="0">
                                     <tr style="height: 17px;">
                                         <td style="padding: 2px 3px 2px 3px;vertical-align: top;border: 1px solid #a7a9ac;font-family: Tahoma;font-size: 12px;"
                                             nowrap="nowrap"><b>Descripcion</b>
                                         </td>"""
             for field in section_data["FIELDS"].split(","):
-                body+=f"""
-                                        <td style="padding: 2px 3px 2px 3px;vertical-align: top;border: 1px solid #a7a9ac;font-family: Tahoma;font-size: 12px;"
-                                            nowrap="nowrap"><b>{field.strip("'").strip('"')}</b>
-                                        </td>"""
-            body += """            </tr>"""
-            
-            body += f"""
-                                    <tr style="height: 17px;">
+                body+=f"""          <td style="padding: 2px 3px 2px 3px;vertical-align: top;border: 1px solid #a7a9ac;font-family: Tahoma;font-size: 12px;"
+                                        nowrap="nowrap"><b>{field.strip("'").strip('"')}</b>
+                                    </td>"""
+            body += f"""            </tr>
+                                    <tr style="height: 17px; background-color: #c4f9b1">
                                         <td style="padding: 2px 3px 2px 3px;vertical-align: top;border: 1px solid #a7a9ac;font-family: Tahoma;font-size: 12px;"
                                             nowrap="nowrap"><b>Hardware Anadido</b>
                                         </td>""" 
             for added in section_data["HARDWARE_ADDED"].split(","):
-                body+=f"""
-                                        <td style="padding: 2px 3px 2px 3px;vertical-align: top;border: 1px solid #a7a9ac;font-family: Tahoma;font-size: 12px;"
+                body+=f"""              <td style="padding: 2px 3px 2px 3px;vertical-align: top;border: 1px solid #a7a9ac;font-family: Tahoma;font-size: 12px;"
                                             nowrap="nowrap"><b>{added.strip("'").strip('"')}</b>
                                         </td>"""
-            body += """            </tr>"""          
-            body += f"""
-                                    <tr style="height: 17px;">
+            body += f"""            </tr>          
+                                    <tr style="height: 17px; background-color: #e57373">
                                         <td style="padding: 2px 3px 2px 3px;vertical-align: top;border: 1px solid #a7a9ac;font-family: Tahoma;font-size: 12px;"
                                             nowrap="nowrap"><b>Hardware Removido</b>
                                         </td>"""
             for removed in section_data["HARDWARE_REMOVED"].split(","):
-                body+=f"""
-                                        <td style="padding: 2px 3px 2px 3px;vertical-align: top;border: 1px solid #a7a9ac;font-family: Tahoma;font-size: 12px;"
+                body+=f"""              <td style="padding: 2px 3px 2px 3px;vertical-align: top;border: 1px solid #a7a9ac;font-family: Tahoma;font-size: 12px;"
                                             nowrap="nowrap"><b>{removed.strip("'").strip('"')}</b>
                                         </td>"""
-            body += """            </tr>
-                                </tbody>
-                            </table>"""
-        body +="""
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </body>
-        </html>
-        """
+            body += """             </tr>
+                                </table>"""
+        body +="""          </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+    </table>
+</body>
+</html>"""
         message.set_content(body, subtype='html')
 
         # Send email
