@@ -27,126 +27,162 @@ email_recipients = config.get('email', 'recipients')
 db_connection = mysql.connector.connect(host=database_host, user=database_username, password=database_password, database=database_name)
 cursor = db_connection.cursor(dictionary=True)
 
+def main():
+    events, events_data = poll_database()
+    if len(events) == 0 :
+        return
+    
+    last_event_id = -1
+    events_to_list = list(events.items())
+    while len(events_to_list) > 0 :
+        events_data_to_process = []
+        events_to_process_dictionary = dict(events_to_list[:3])
+        first_event_id = list(events_to_process_dictionary)[0]
+        last_event_id = list(events_to_process_dictionary)[-1]
+        print (str(first_event_id)+"----"+str(last_event_id)+"\n")
+        events_to_list = events_to_list[3:]
+        for event_data in events_data:
+            if event_data['EVENT_ID'] <= last_event_id:
+                events_data_to_process.append(event_data)
+                events_data = events_data[1:]
+
+        body = buildContent(events_to_process_dictionary, events_data_to_process)
+    
+        sendmail(body)
+
+    if last_event_id:    
+        save_last_id(last_event_id)
+
 def poll_database():
     last_id = str(load_last_id())
     query = "SELECT * FROM hardware_change_events WHERE ID > " + last_id + " ORDER BY ID"
     cursor.execute(query)
     hardware_change_event_list = cursor.fetchall()
-    
+
     # Send email if there are new results
     if hardware_change_event_list:
         event_list_dictionary = {event["ID"]: event for event in hardware_change_event_list}
         query = "SELECT * FROM hardware_change_events_data WHERE EVENT_ID >= "+ str(hardware_change_event_list[0]["ID"]) + " ORDER BY EVENT_ID"
         cursor.execute(query)
         hardware_change_event_data_list = cursor.fetchall()
-
-        # Format message
-        message = EmailMessage()
-        message['Subject'] = "Cambio de Hardware detectado"
-        message['From'] = email_sender
-
-        body = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-        </head>
-        <body>
-            <table style="border-collapse: collapse;" width="100%" cellspacing="0" cellpadding="0">
-                    <tr>
-                        <td style="border: none;background-color: #fb9895;color: White;font-weight: bold;font-size: 16px;padding: 10px;font-family: Tahoma;">Alerta: Cambio de Hardware detectado</td>
-                    </tr>
-                    <tr>
-                        <td style="border: none; padding: 0px;font-family: Tahoma;font-size: 12px;">
-                            <table style="border-style: solid;border-width: 1px;margin:30px 0 0;">
+    
+        return event_list_dictionary, hardware_change_event_data_list
+ 
+    return {}, {}
+    
+def buildContent(array_events, array_events_data):
+    body ="""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    </head>
+        <style>
+            .sessionDetails {
+                height: 35px;font-size: 24px;vertical-align: middle;padding: 5px 0 0 15px; font-family: Tahoma;
+            }
+            .viewOcsLink {
+                height: 35px;font-size: 24px;vertical-align: middle;padding: 0 20px; font-family: Tahoma;
+            }
+            .session {
+                font-size: 20px;vertical-align: middle;padding: 5px 0 0 15px; font-family: Tahoma;
+            }
+            .column {
+                padding: 2px 3px 2px 3px;vertical-align: top;border: 1px solid #a7a9ac;font-family: Tahoma;font-size: 12px;
+            }
+        </style>
+    <body>
+        <table style="border-collapse: collapse;" width="100%" cellspacing="0" cellpadding="0">
+                <tr>
+                    <td style="border: none;background-color: #fb9895;color: White;font-weight: bold;font-size: 16px;padding: 10px;font-family: Tahoma;">Alerta: Cambio de Hardware detectado</td>
+                </tr>
+                <tr>
+                    <td style="border: none; padding: 0px;font-family: Tahoma;font-size: 12px;">
+                        <table style="border-style: solid;border-width: 1px;margin:30px 0 0;">
                             <tr>
                                 <td>"""
+    current_event_id = 0
+    for section_data in array_events_data:
+        if current_event_id != section_data["EVENT_ID"]:
+            if (current_event_id):
+                body +="""     </td>
+                            </tr>
+                        </table>
+                        <table style="border-style: solid;border-width: 1px;margin:30px 0 0;">
+                            <tr>
+                                <td>"""
+            current_event_id = section_data["EVENT_ID"]
+            event_data = array_events[current_event_id]
 
-        current_event_id = 0
-        for section_data in hardware_change_event_data_list:
-            if current_event_id != section_data["EVENT_ID"]:
-                if (current_event_id):
-                    body +=f"""     </td>
-                                </tr>
-                            </table>
-                            <table style="border-style: solid;border-width: 1px;margin:30px 0 0;">
-                                <tr>
-                                    <td>"""
-                current_event_id = section_data["EVENT_ID"]
-                event_data = event_list_dictionary[current_event_id]
+            body +=f"""             <table width="100%" cellspacing="0" cellpadding="0">
+                                        <tr style="height: 17px;background-color: #4fc3f7">
+                                            <td class="sessionDetails">
+                                                <span>EventId: {str(current_event_id)}- PC: {str(event_data["NAME"])} - IP: {str(event_data["IP_ADDRESS"])} - Usuario: {str(event_data["USERNAME"])} - Ultimo scan: {str(event_data["LAST_SCAN_DATETIME"])}</span>
+                                            </td>
+                                            <td class="viewOcsLink">
+                                                <span><a href="{str(ocsinventory_server_url)}/ocsreports/index.php?function=computer&head=1&systemid={str(event_data["HARDWARE_ID"])}" target=”_blank”>Ver equipo en OCSInventory </a></span>
+                                            </td>
+                                        </tr>
+                                    </table>"""
+        body += f"""                <table style="margin: 0px;border-collapse: collapse;" width="100%" cellspacing="0" cellpadding="0">
+                                        <tr style="height: 17px;">
+                                            <td class="session">{section_data["SECTION"]}</td>
+                                        </tr>
+                                    </table>"""
+        body += """                 <table style="margin: 0px;border-collapse: collapse;" width="100%" cellspacing="0" cellpadding="0">
+                                        <tr style="height: 17px;">
+                                            <td class="column"><b>Descripcion</b>
+                                            </td>"""
+        for field in section_data["FIELDS"].split(","):
+            body+=f"""                  <td class="column"><b>{field.strip("'").strip('"')}</b>
+                                        </td>"""
+        body += """                     </tr>
+                                        <tr style="height: 17px; background-color: #c4f9b1">
+                                            <td class="column"
+                                                nowrap="nowrap"><b>Hardware Anadido</b>
+                                            </td>""" 
+        for added in section_data["HARDWARE_ADDED"].split(","):
+            body+=f"""                      <td class="column"
+                                                nowrap="nowrap"><b>{added.strip("'").strip('"')}</b>
+                                            </td>"""
+        body += """                     </tr>          
+                                        <tr style="height: 17px; background-color: #e57373">
+                                            <td class="column"
+                                                nowrap="nowrap"><b>Hardware Removido</b>
+                                            </td>"""
+        for removed in section_data["HARDWARE_REMOVED"].split(","):
+            body+=f"""                      <td class="column"
+                                                nowrap="nowrap"><b>{removed.strip("'").strip('"')}</b>
+                                            </td>"""
+        body += """                     </tr>
+                                    </table>"""
+    body +="""                  </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+        </table>
+    </body>
+    </html>"""
+    return body
 
-                body +=f"""     <table width="100%" cellspacing="0" cellpadding="0">
-                                    <tr style="height: 17px;background-color: #4fc3f7">
-                                        <td class="sessionDetails" style="height: 35px;font-size: 24px;vertical-align: middle;padding: 5px 0 0 15px; font-family: Tahoma;">
-                                            <span>PC: {str(event_data["NAME"])} - IP: {str(event_data["IP_ADDRESS"])} - Usuario: {str(event_data["USERNAME"])} - Ultimo scan: {str(event_data["LAST_SCAN_DATETIME"])}</span>
-                                        </td>
-                                        <td align="right" style="height: 35px;font-size: 24px;vertical-align: middle;padding: 0 20px; font-family: Tahoma;">
-                                            <span><a href="{str(ocsinventory_server_url)}/ocsreports/index.php?function=computer&head=1&systemid={str(event_data["HARDWARE_ID"])}" target=”_blank”>Ver equipo en OCSInventory </a></span>
-                                        </td>
-                                    </tr>
-                                </table>"""
-            body += f"""        <table style="margin: 0px;border-collapse: collapse;" width="100%" cellspacing="0" cellpadding="0">
-                                    <tr style="height: 17px;">
-                                        <td style="font-size: 20px;vertical-align: middle;padding: 5px 0 0 15px; font-family: Tahoma;" nowrap="nowrap">{section_data["SECTION"]}</td>
-                                    </tr>
-                                </table>"""
-            body += f"""        <table style="margin: 0px;border-collapse: collapse;" width="100%" cellspacing="0" cellpadding="0">
-                                    <tr style="height: 17px;">
-                                        <td style="padding: 2px 3px 2px 3px;vertical-align: top;border: 1px solid #a7a9ac;font-family: Tahoma;font-size: 12px;"
-                                            nowrap="nowrap"><b>Descripcion</b>
-                                        </td>"""
-            for field in section_data["FIELDS"].split(","):
-                body+=f"""          <td style="padding: 2px 3px 2px 3px;vertical-align: top;border: 1px solid #a7a9ac;font-family: Tahoma;font-size: 12px;"
-                                        nowrap="nowrap"><b>{field.strip("'").strip('"')}</b>
-                                    </td>"""
-            body += f"""            </tr>
-                                    <tr style="height: 17px; background-color: #c4f9b1">
-                                        <td style="padding: 2px 3px 2px 3px;vertical-align: top;border: 1px solid #a7a9ac;font-family: Tahoma;font-size: 12px;"
-                                            nowrap="nowrap"><b>Hardware Anadido</b>
-                                        </td>""" 
-            for added in section_data["HARDWARE_ADDED"].split(","):
-                body+=f"""              <td style="padding: 2px 3px 2px 3px;vertical-align: top;border: 1px solid #a7a9ac;font-family: Tahoma;font-size: 12px;"
-                                            nowrap="nowrap"><b>{added.strip("'").strip('"')}</b>
-                                        </td>"""
-            body += f"""            </tr>          
-                                    <tr style="height: 17px; background-color: #e57373">
-                                        <td style="padding: 2px 3px 2px 3px;vertical-align: top;border: 1px solid #a7a9ac;font-family: Tahoma;font-size: 12px;"
-                                            nowrap="nowrap"><b>Hardware Removido</b>
-                                        </td>"""
-            for removed in section_data["HARDWARE_REMOVED"].split(","):
-                body+=f"""              <td style="padding: 2px 3px 2px 3px;vertical-align: top;border: 1px solid #a7a9ac;font-family: Tahoma;font-size: 12px;"
-                                            nowrap="nowrap"><b>{removed.strip("'").strip('"')}</b>
-                                        </td>"""
-            body += """             </tr>
-                                </table>"""
-        body +="""          </td>
-                        </tr>
-                    </table>
-                </td>
-            </tr>
-    </table>
-</body>
-</html>"""
-        message.set_content(body, subtype='html')
+def sendmail(body):
+    #Send email
+    smtp_server = smtplib.SMTP_SSL(email_server, email_server_port) if email_server_use_ssl else smtplib.SMTP(email_server, email_server_port)
+    smtp_server.ehlo()
+    smtp_server.login(email_sender, email_password)
 
-        # Send email
-        smtp_server = smtplib.SMTP_SSL(email_server, email_server_port) if email_server_use_ssl else smtplib.SMTP(email_server, email_server_port)
-        smtp_server.ehlo()
-        smtp_server.login(email_sender, email_password)
-        
-        for recipient in email_recipients.split(","):
-           sendmail(smtp_server, recipient, message) 
-        smtp_server.close()
-
-        last_id = hardware_change_event_list[-1]["ID"]
-        save_last_id(last_id)
+    message = EmailMessage()
+    message['Subject'] = "Cambio de Hardware detectado"
+    message['From'] = email_sender
+    message.set_content(body, subtype='html')
     
-    return last_id
+    for recipient in email_recipients.split(","):
+        message['To'] = recipient
+        smtp_server.sendmail(email_sender, recipient, message.as_string())
+        del message['To']
+    smtp_server.close()
 
-def sendmail(mail_server, recipient, message: EmailMessage):
-    message['To'] = recipient
-    mail_server.sendmail(email_sender, recipient, message.as_string())
-    del message['To']
     
 def close_db_connection():
     cursor.close()
@@ -167,5 +203,5 @@ def load_last_id():
     return last_id
 
 while True:
-    poll_database()
+    main()
     time.sleep(30)
