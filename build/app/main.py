@@ -28,25 +28,22 @@ db_connection = mysql.connector.connect(host=database_host, user=database_userna
 cursor = db_connection.cursor(dictionary=True)
 
 def main():
-    events, events_data = poll_database()
-    if len(events) == 0 :
+    events_list, events_data_list = poll_database()
+    if len(events_list) == 0 :
         return
     
     last_event_id = -1
-    events_to_list = list(events.items())
-    while len(events_to_list) > 0 :
-        events_data_to_process = []
-        events_to_process_dictionary = dict(events_to_list[:3])
-        first_event_id = list(events_to_process_dictionary)[0]
+    while len(events_list) > 0 :
+        events_data_to_process_list = []
+        events_to_process_dictionary = dict(events_list[:3])
         last_event_id = list(events_to_process_dictionary)[-1]
-        print (str(first_event_id)+"----"+str(last_event_id)+"\n")
-        events_to_list = events_to_list[3:]
-        for event_data in events_data:
+        events_list = events_list[3:]
+        for event_data in events_data_list:
             if event_data['EVENT_ID'] <= last_event_id:
-                events_data_to_process.append(event_data)
-                events_data = events_data[1:]
+                events_data_to_process_list.append(event_data)
+                events_data_list = events_data_list[1:]
 
-        body = buildContent(events_to_process_dictionary, events_data_to_process)
+        body = buildContent(events_to_process_dictionary, events_data_to_process_list)
     
         sendmail(body)
 
@@ -66,11 +63,11 @@ def poll_database():
         cursor.execute(query)
         hardware_change_event_data_list = cursor.fetchall()
     
-        return event_list_dictionary, hardware_change_event_data_list
+        return list(event_list_dictionary.items()), hardware_change_event_data_list
  
     return {}, {}
     
-def buildContent(array_events, array_events_data):
+def buildContent(events_list, events_data_list):
     body ="""
     <!DOCTYPE html>
     <html>
@@ -102,8 +99,8 @@ def buildContent(array_events, array_events_data):
                             <tr>
                                 <td>"""
     current_event_id = 0
-    for section_data in array_events_data:
-        if current_event_id != section_data["EVENT_ID"]:
+    for event_data in events_data_list:
+        if current_event_id != event_data["EVENT_ID"]:
             if (current_event_id):
                 body +="""     </td>
                             </tr>
@@ -111,52 +108,47 @@ def buildContent(array_events, array_events_data):
                         <table style="border-style: solid;border-width: 1px;margin:30px 0 0;">
                             <tr>
                                 <td>"""
-            current_event_id = section_data["EVENT_ID"]
-            event_data = array_events[current_event_id]
+            current_event_id = event_data["EVENT_ID"]
+            event = events_list[current_event_id]
 
             body +=f"""             <table width="100%" cellspacing="0" cellpadding="0">
                                         <tr style="height: 17px;background-color: #4fc3f7">
                                             <td class="sessionDetails">
-                                                <span>EventId: {str(current_event_id)}- PC: {str(event_data["NAME"])} - IP: {str(event_data["IP_ADDRESS"])} - Usuario: {str(event_data["USERNAME"])} - Ultimo scan: {str(event_data["LAST_SCAN_DATETIME"])}</span>
+                                                <span>EventId: { str(current_event_id) } - PC: {str(event["NAME"])} - IP: {str(event["IP_ADDRESS"])} - Usuario: {str(event["USERNAME"])} - Ultimo scan: {str(event["LAST_SCAN_DATETIME"])}</span>
                                             </td>
                                             <td class="viewOcsLink">
-                                                <span><a href="{str(ocsinventory_server_url)}/ocsreports/index.php?function=computer&head=1&systemid={str(event_data["HARDWARE_ID"])}" target=”_blank”>Ver equipo en OCSInventory </a></span>
+                                                <span><a href="{str(ocsinventory_server_url)}/ocsreports/index.php?function=computer&head=1&systemid={str(event["HARDWARE_ID"])}" target=”_blank”>Ver equipo en OCSInventory </a></span>
                                             </td>
                                         </tr>
                                     </table>"""
         body += f"""                <table style="margin: 0px;border-collapse: collapse;" width="100%" cellspacing="0" cellpadding="0">
                                         <tr style="height: 17px;">
-                                            <td class="session">{section_data["SECTION"]}</td>
+                                            <td class="session">{event_data["SECTION"]}</td>
                                         </tr>
                                     </table>"""
         body += """                 <table style="margin: 0px;border-collapse: collapse;" width="100%" cellspacing="0" cellpadding="0">
                                         <tr style="height: 17px;">
-                                            <td class="column"><b>Descripcion</b>
-                                            </td>"""
-        for field in section_data["FIELDS"].split(","):
-            body+=f"""                  <td class="column"><b>{field.strip("'").strip('"')}</b>
-                                        </td>"""
-        body += """                     </tr>
-                                        <tr style="height: 17px; background-color: #c4f9b1">
-                                            <td class="column"
-                                                nowrap="nowrap"><b>Hardware Anadido</b>
-                                            </td>""" 
-        for added in section_data["HARDWARE_ADDED"].split(","):
-            body+=f"""                      <td class="column"
-                                                nowrap="nowrap"><b>{added.strip("'").strip('"')}</b>
-                                            </td>"""
-        body += """                     </tr>          
-                                        <tr style="height: 17px; background-color: #e57373">
-                                            <td class="column"
-                                                nowrap="nowrap"><b>Hardware Removido</b>
-                                            </td>"""
-        for removed in section_data["HARDWARE_REMOVED"].split(","):
-            body+=f"""                      <td class="column"
-                                                nowrap="nowrap"><b>{removed.strip("'").strip('"')}</b>
-                                            </td>"""
-        body += """                     </tr>
-                                    </table>"""
-    body +="""                  </td>
+                                            <td class="column"><b>Descripcion</b></td>"""
+        for field in event_data["FIELDS"].split(","):
+            body+=f"""                     <td class="column"><b>{field}</b></td>"""
+        body += """                     </tr>"""
+        
+        for added in event_data["HARDWARE_ADDED"].split("|"):
+            body+=f"""                  <tr style="height: 17px; background-color: #c4f9b1">
+                                            <td class="column"><b>Hardware Anadido</b></td>"""
+            for cell in added.split(","):
+                body+=f"""                  <td class="column"><b>{cell}</b></td>"""
+            body+=f"""                  </tr>"""
+        
+        for removed in event_data["HARDWARE_REMOVED"].split("|"):
+            body+=f"""                  <tr style="height: 17px; background-color: #e57373">
+                                            <td class="column"><b>Hardware Removido</b></td>"""
+            for cell in removed.split(","):
+                body+=f"""                  <td class="column"><b>{cell}</b></td>"""
+            body+=f"""                  </tr>"""
+
+    body +="""                      </table>
+                                </td>
                             </tr>
                         </table>
                     </td>
